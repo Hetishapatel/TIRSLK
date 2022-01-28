@@ -1,0 +1,213 @@
+//*****************************************************************************
+// traverse through room and avoid obstacle
+//*****************************************************************************
+
+#include "SimpleRSLK.h" 
+const int trigPin0 =32;                                                //3.5 Trigger pin for sensor 0
+const int echoPin0 = 33;                                            //5.1 Echo pin for sensor 0
+const int trigPin1 =38;                                                //2.4 Trigger pin for sensor 1
+const int echoPin1 = 18;                                             //3.0 Echo pin for sensor 1      
+#define WHEEL_DIAMETER 7.0                                // diameter of the wheel
+#define CNT_PER_REV 360                                        // number of pulses for one wheel rotation
+#define TURN90DEGREE 10.9956                             // cm to take 90 degrees turn
+#define WHEELSPEED 35                                            // speed of wheel
+                   
+//*****************************************************************************
+// take readings and return most accurate distance from wall
+//*****************************************************************************
+
+float takeReadings0(){  
+
+  int  tmp,i,j;
+  long pulseLength;
+  long centimeters;
+  float readings[5];
+  for (int i=0;i<5;i++){
+   digitalWrite(trigPin0, LOW);                                         // send low to get a clean pulse
+   delayMicroseconds(5);                                                 // let it settle
+   digitalWrite(trigPin0, HIGH);                                        // send high to trigger device
+   delayMicroseconds(10);      
+  
+   pulseLength = pulseIn(echoPin0, HIGH);                   // measure pulse coming back
+   centimeters = pulseLength / 58;                                // covert to centimeters
+   readings[i]=centimeters;
+  }
+ 
+  for(i=0; i<5; i++)                                                             // sorting
+  {
+    for( j=i+1; j<5; j++)
+    {
+      if (readings[i]>readings[j])
+      {
+        tmp=readings[i];
+        readings[i]=readings[j];
+        readings[j]=tmp;
+      }
+    }
+  }
+  Serial.print("distance from wall: ");
+  Serial.println(readings[2]);
+  return readings[2];                                                            // return most accurate reading
+  }
+//*****************************************************************************
+// take readings and return most accurate reading 
+// to maintain 10 cm from wall and to ensure if the obstacle has avoided
+//*****************************************************************************
+
+float takeReadings1(){  
+
+  int  tmp,i,j;
+  long pulseLength;
+  long centimeters;
+  float readings[5];
+  for (int i=0;i<5;i++){
+   digitalWrite(trigPin1, LOW);                                   // send low to get a clean pulse
+   delayMicroseconds(5);                                           // let it settle
+   digitalWrite(trigPin1, HIGH);                                 // send high to trigger device
+   delayMicroseconds(10);      
+  
+   pulseLength = pulseIn(echoPin1, HIGH);             // measure pulse coming back
+   centimeters = pulseLength / 58;
+   readings[i]=centimeters;
+  }
+ 
+  for(i=0; i<5; i++)
+  {
+    for( j=i+1; j<5; j++)
+    {
+      if (readings[i]>readings[j])
+      {
+        tmp=readings[i];
+        readings[i]=readings[j];
+        readings[j]=tmp;
+      }
+    }
+  }
+  Serial.print(" dis= ");
+  Serial.println(readings[2]);
+  return readings[2]; 
+   
+}
+
+//*****************************************************************************
+// count the number of pulses for given distance
+//*****************************************************************************
+
+uint32_t countForDistance(float wheel_diam, uint16_t cnt_per_rev, float distance) {
+  float temp = (wheel_diam * PI) / cnt_per_rev;
+  temp = distance / temp;
+  return int(temp);
+}
+
+//*****************************************************************************
+// drive straight while maintaining 10 cm from the wall
+//*****************************************************************************
+  void straight(float n)
+{
+    uint16_t totalCount = 0; // Total amount of encoder pulses received
+    uint16_t straight = countForDistance(WHEEL_DIAMETER, CNT_PER_REV, n);
+      resetLeftEncoderCnt();  
+      resetRightEncoderCnt();                                                 // Set the encoder pulses count back to zero
+      setMotorDirection(BOTH_MOTORS,MOTOR_DIR_FORWARD); // Cause the robot to drive forward
+      enableMotor(BOTH_MOTORS);                                                       // "Turn on" the motor
+      setMotorSpeed(BOTH_MOTORS,WHEELSPEED);                         // Set motor speed
+      while(totalCount < straight) {                                                          // Drive motor until it has received the
+        totalCount = getEncoderLeftCnt();                                               //    correct number of pulses to travel
+        if (takeReadings1()< 15){                                             // 15 taken as sensor is not at edge of  the vehicle
+          setMotorSpeed(RIGHT_MOTOR,WHEELSPEED+5);  // adjust the speed to bring back on right track
+        }
+        if (takeReadings1()> 15){
+          setMotorSpeed(LEFT_MOTOR,WHEELSPEED+5);
+        }
+     }
+        disableMotor(BOTH_MOTORS);                        // Halt motors
+        delay(1000);
+}
+//*****************************************************************************
+// turn 90 degree counter clock wise 
+//*****************************************************************************
+
+void turnccw()
+{
+uint16_t turn = countForDistance(WHEEL_DIAMETER, CNT_PER_REV, TURN90DEGREE);
+uint16_t totalCount=0;                                     // reset variable used to read encoder pulses
+resetLeftEncoderCnt();  
+resetRightEncoderCnt();                                  // Set the encoder pulses count back to zero
+setMotorDirection(RIGHT_MOTOR,MOTOR_DIR_FORWARD);
+setMotorDirection(LEFT_MOTOR,MOTOR_DIR_BACKWARD);  
+enableMotor(BOTH_MOTORS);                        // "Turn on" the motor
+setMotorSpeed(BOTH_MOTORS,WHEELSPEED);             // Set motor speed
+while(totalCount < turn)                                    // while the desired pulses is not reached
+{                                                                          
+  totalCount = getEncoderLeftCnt();               //    correct number of pulses to travel
+  }
+  disableMotor(BOTH_MOTORS);                         // Halt motors
+  delay(1000);
+}
+
+//*****************************************************************************
+// turn 90 degree clock wise
+//*****************************************************************************
+void turncw()
+{
+uint16_t turn = countForDistance(WHEEL_DIAMETER, CNT_PER_REV, TURN90DEGREE);
+uint16_t totalCount=0;                                     // reset variable used to read encoder pulses
+resetLeftEncoderCnt();  
+resetRightEncoderCnt();                                    // Set the encoder pulses count back to zero
+setMotorDirection(RIGHT_MOTOR,MOTOR_DIR_BACKWARD);
+setMotorDirection(LEFT_MOTOR,MOTOR_DIR_FORWARD);  
+enableMotor(BOTH_MOTORS);                          // "Turn on" the motor
+setMotorSpeed(BOTH_MOTORS,WHEELSPEED);             // Set motor speed
+while(totalCount < turn) 
+{                     
+  totalCount = getEncoderLeftCnt();                      //    correct number of pulses to travel
+  }
+  disableMotor(BOTH_MOTORS);                         // Halt motors                                    
+  delay(1000);
+}
+//*****************************************************************************
+// function to avoid obstacle 
+//*****************************************************************************
+void avoid(){
+ straight(takeReadings0()-12);                             // 12 subtracted as the sensor is not on the edge of vehicle
+turnccw();
+for(int i=0; i<2; i++){
+resetLeftEncoderCnt();  
+resetRightEncoderCnt();                                              // Set the encoder pulses count back to zero
+setMotorDirection(BOTH_MOTORS,MOTOR_DIR_FORWARD); // Cause the robot to drive forward
+enableMotor(BOTH_MOTORS);                                // "Turn on" the motor
+setMotorSpeed(BOTH_MOTORS,WHEELSPEED);   
+while(takeReadings1() >= 14 && takeReadings1() <= 16){} // while obstacle is still sensed
+delay(1000);                                                                   // to let the vehicle pass the obstacle fully
+disableMotor(BOTH_MOTORS);                                 // halt the motor
+turncw();                                                                         // turn cw 90 degree
+}
+straight(takeReadings0()-12);
+turnccw();
+straight(takeReadings0()-12);                                    // drive straight to get to end of the wall 
+turnccw();
+delay(1000);
+}
+
+void setup() {
+  pinMode(trigPin0, OUTPUT);     //set up trigger pin as output.
+  pinMode(echoPin0, INPUT);      //set up echo pin as input.
+  pinMode(trigPin1, OUTPUT);     //set up trigger pin as output.
+ pinMode(echoPin1, INPUT);      //set up echo pin as input.
+  Serial.begin(9600);                      //opens serial port and set data rate at 9600 bps. 
+  setupRSLK();                                  // setting up rslk
+  setupWaitBtn(LP_LEFT_BTN);   // Left button on Launchpad
+  setupLed(RED_LED);                   // Red LED of the RGB LED
+ 
+}
+void loop()
+{
+  float distance = takeReadings0();
+  if (distance < 150){                        // if the distance measured is smaller than 1.5 m then there is obstacle 
+    avoid();                                          // call avoid function to avoid the obstacle
+  }
+else{
+straight(distance-12);                   // 12 subtracted as the sensor is not on the edge of the vehicle
+turnccw();
+}
+}
